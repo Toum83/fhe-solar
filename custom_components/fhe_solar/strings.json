@@ -1,0 +1,122 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "FHE Smart account",
+        "description": "Credentials of your FHE Smart portal (fhesmart.fhe-france.com).",
+        "data": {
+          "username": "Username or email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate FHE Smart",
+        "description": "The password for {username} was refused. Enter the new one.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credentials refused by FHE Smart",
+      "cannot_connect": "Unable to reach the FHE Smart portal",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This account is already configured",
+      "reauth_successful": "Re-authentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "FHE Solar options",
+        "data": {
+          "scan_interval": "Refresh interval",
+          "price_import": "Grid electricity price",
+          "price_export": "Surplus buy-back price",
+          "price_export_above": "Buy-back price above the cap",
+          "export_cap_kwh": "Annual buy-back cap",
+          "contract_anniversary": "Contract year start (MM-DD)"
+        },
+        "data_description": {
+          "scan_interval": "Minutes between two polls of the FHE portal.",
+          "price_import": "Used to value self-consumed kWh in the weekly report.",
+          "price_export": "Used to value exported kWh in the weekly report.",
+          "price_export_above": "Applied to kWh exported past the cap.",
+          "export_cap_kwh": "Volume bought back at the standard price per contract year.",
+          "contract_anniversary": "Date the cap resets, MM-DD (01-01 = calendar year)."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "production_power": {
+        "name": "Production power"
+      },
+      "consumption_power": {
+        "name": "Consumption power"
+      },
+      "production_today": {
+        "name": "Production today"
+      },
+      "consumption_today": {
+        "name": "Consumption today"
+      },
+      "self_consumption_today": {
+        "name": "Self-consumption today"
+      },
+      "grid_import_today": {
+        "name": "Grid import today"
+      },
+      "grid_export_today": {
+        "name": "Grid export today"
+      },
+      "self_consumption_rate": {
+        "name": "Self-consumption rate"
+      },
+      "self_sufficiency_rate": {
+        "name": "Self-sufficiency rate"
+      },
+      "forecast_today": {
+        "name": "Production forecast today"
+      },
+      "forecast_tomorrow": {
+        "name": "Production forecast tomorrow"
+      }
+    }
+  },
+  "services": {
+    "get_weekly_report": {
+      "name": "Get weekly report",
+      "description": "Returns production, consumption, self-consumption and savings over a period (defaults to the last full week, Monday to Sunday).",
+      "fields": {
+        "start_date": {
+          "name": "Start date",
+          "description": "First day (inclusive). Defaults to last Monday."
+        },
+        "end_date": {
+          "name": "End date",
+          "description": "Last day (inclusive). Defaults to last Sunday."
+        },
+        "price_import": {
+          "name": "Grid price",
+          "description": "€/kWh, overrides the integration option."
+        },
+        "price_export": {
+          "name": "Buy-back price",
+          "description": "€/kWh, overrides the integration option."
+        },
+        "price_export_above": {
+          "name": "Buy-back price above cap",
+          "description": "€/kWh past the annual cap."
+        },
+        "export_cap_kwh": {
+          "name": "Annual cap",
+          "description": "kWh bought back at the standard price each contract year."
+        }
+      }
+    }
+  }
+}

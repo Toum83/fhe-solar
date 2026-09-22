@@ -1,0 +1,46 @@
+get_weekly_report:
+  fields:
+    start_date:
+      example: "2026-09-14"
+      selector:
+        date:
+    end_date:
+      example: "2026-09-20"
+      selector:
+        date:
+    price_import:
+      example: 0.25
+      selector:
+        number:
+          min: 0
+          max: 2
+          step: 0.0001
+          unit_of_measurement: "€/kWh"
+          mode: box
+    price_export:
+      example: 0.04
+      selector:
+        number:
+          min: 0
+          max: 2
+          step: 0.0001
+          unit_of_measurement: "€/kWh"
+          mode: box
+    price_export_above:
+      example: 0.05
+      selector:
+        number:
+          min: 0
+          max: 2
+          step: 0.0001
+          unit_of_measurement: "€/kWh"
+          mode: box
+    export_cap_kwh:
+      example: 1143
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: 1
+          unit_of_measurement: "kWh"
+          mode: box

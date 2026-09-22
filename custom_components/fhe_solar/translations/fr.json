@@ -1,0 +1,122 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Compte FHE Smart",
+        "description": "Identifiants de votre portail FHE Smart (fhesmart.fhe-france.com).",
+        "data": {
+          "username": "Code utilisateur ou email",
+          "password": "Mot de passe"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnexion FHE Smart",
+        "description": "Le mot de passe de {username} a été refusé. Saisissez le nouveau.",
+        "data": {
+          "password": "Mot de passe"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Identifiants refusés par FHE Smart",
+      "cannot_connect": "Portail FHE Smart injoignable",
+      "unknown": "Erreur inattendue"
+    },
+    "abort": {
+      "already_configured": "Ce compte est déjà configuré",
+      "reauth_successful": "Reconnexion réussie"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options FHE Solar",
+        "data": {
+          "scan_interval": "Intervalle de rafraîchissement",
+          "price_import": "Prix du kWh acheté au réseau",
+          "price_export": "Prix de rachat du surplus",
+          "price_export_above": "Prix de rachat au-delà du plafond",
+          "export_cap_kwh": "Plafond annuel de rachat",
+          "contract_anniversary": "Début de l'année contractuelle (MM-JJ)"
+        },
+        "data_description": {
+          "scan_interval": "Minutes entre deux interrogations du portail FHE.",
+          "price_import": "Sert à valoriser les kWh autoconsommés dans le bilan hebdomadaire.",
+          "price_export": "Sert à valoriser les kWh injectés dans le bilan hebdomadaire.",
+          "price_export_above": "Tarif appliqué aux kWh injectés après le plafond.",
+          "export_cap_kwh": "Volume racheté au tarif principal sur une année contractuelle.",
+          "contract_anniversary": "Date de remise à zéro du plafond, au format MM-JJ (01-01 = année civile)."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "production_power": {
+        "name": "Puissance produite"
+      },
+      "consumption_power": {
+        "name": "Puissance consommée"
+      },
+      "production_today": {
+        "name": "Production du jour"
+      },
+      "consumption_today": {
+        "name": "Consommation du jour"
+      },
+      "self_consumption_today": {
+        "name": "Autoconsommation du jour"
+      },
+      "grid_import_today": {
+        "name": "Soutirage réseau du jour"
+      },
+      "grid_export_today": {
+        "name": "Injection réseau du jour"
+      },
+      "self_consumption_rate": {
+        "name": "Taux d'autoconsommation"
+      },
+      "self_sufficiency_rate": {
+        "name": "Taux d'autoproduction"
+      },
+      "forecast_today": {
+        "name": "Prévision production aujourd'hui"
+      },
+      "forecast_tomorrow": {
+        "name": "Prévision production demain"
+      }
+    }
+  },
+  "services": {
+    "get_weekly_report": {
+      "name": "Bilan hebdomadaire",
+      "description": "Renvoie production, consommation, autoconsommation et économies sur une période (par défaut la dernière semaine complète, du lundi au dimanche).",
+      "fields": {
+        "start_date": {
+          "name": "Date de début",
+          "description": "Premier jour (inclus). Par défaut : lundi dernier."
+        },
+        "end_date": {
+          "name": "Date de fin",
+          "description": "Dernier jour (inclus). Par défaut : dimanche dernier."
+        },
+        "price_import": {
+          "name": "Prix réseau",
+          "description": "€/kWh, remplace l'option de l'intégration."
+        },
+        "price_export": {
+          "name": "Prix de rachat",
+          "description": "€/kWh, remplace l'option de l'intégration."
+        },
+        "price_export_above": {
+          "name": "Prix au-delà du plafond",
+          "description": "€/kWh une fois le plafond annuel atteint."
+        },
+        "export_cap_kwh": {
+          "name": "Plafond annuel",
+          "description": "kWh rachetés au tarif principal par année contractuelle."
+        }
+      }
+    }
+  }
+}
