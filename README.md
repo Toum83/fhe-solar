@@ -45,7 +45,7 @@ response_variable: report
 
 Le dépôt doit contenir `custom_components/fhe_solar` **à sa racine** : pousser
 le contenu de ce dossier `ha-integration/` dans un dépôt GitHub dédié
-(ex. `thomashuchet/fhe-solar`), puis dans HACS → ⋮ → *Dépôts personnalisés* →
+(ex. `Toum83/fhe-solar`), puis dans HACS → ⋮ → *Dépôts personnalisés* →
 ajouter l'URL, catégorie *Intégration* → installer → redémarrer HA.
 
 ### Manuelle

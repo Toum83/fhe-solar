@@ -1,13 +1,13 @@
 {
   "domain": "fhe_solar",
   "name": "FHE Solar",
-  "codeowners": ["@thomashuchet"],
+  "codeowners": ["@Toum83"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/thomashuchet/fhe-solar",
+  "documentation": "https://github.com/Toum83/fhe-solar",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/thomashuchet/fhe-solar/issues",
+  "issue_tracker": "https://github.com/Toum83/fhe-solar/issues",
   "requirements": [],
   "version": "0.1.0"
 }
