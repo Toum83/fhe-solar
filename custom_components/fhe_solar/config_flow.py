@@ -11,7 +11,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -58,8 +58,13 @@ class FheConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def _async_validate(self, username: str, password: str) -> str | None:
-        """Teste la connexion ; renvoie une clé d'erreur ou None."""
-        session = async_create_clientsession(self.hass)
+        """Teste la connexion ; renvoie une clé d'erreur ou None.
+
+        Utilise la session HTTP partagée de Home Assistant (``async_get_clientsession``)
+        et ne la ferme jamais : c'est une ressource gérée par HA, la fermer ici casserait
+        les requêtes suivantes (y compris celles du setup réel de l'entrée).
+        """
+        session = async_get_clientsession(self.hass)
         client = FheClient(session, username, password)
         try:
             await client.login()
@@ -70,8 +75,6 @@ class FheConfigFlow(ConfigFlow, domain=DOMAIN):
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Erreur inattendue pendant la validation FHE")
             return "unknown"
-        finally:
-            await session.close()
         return None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
