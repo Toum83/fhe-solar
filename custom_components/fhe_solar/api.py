@@ -311,14 +311,21 @@ def _parse_dashboard(raw: dict[str, Any]) -> DashboardData:
         except (TypeError, ValueError):
             return 0.0
 
+    production = _kwh("prod")
+    consumption = _kwh("conso")
+    self_consumption = _kwh("autoconso")
+
     return DashboardData(
         production_power=prod_power,
         consumption_power=conso_power,
-        production_today=_kwh("prod"),
-        consumption_today=_kwh("conso"),
-        self_consumption_today=_kwh("autoconso"),
-        grid_import_today=_kwh("reseau"),
-        grid_export_today=_kwh("surprod"),
+        production_today=production,
+        consumption_today=consumption,
+        self_consumption_today=self_consumption,
+        # FHE ne rafraîchit "reseau"/"surprod" que toutes les quelques heures
+        # (figés la nuit puis rattrapés d'un bloc) : on les dérive des trois
+        # totaux ci-dessus, eux mis à jour en continu.
+        grid_import_today=round(max(consumption - self_consumption, 0.0), 3),
+        grid_export_today=round(max(production - self_consumption, 0.0), 3),
         forecast_today=(forecast.get("today") or {}).get("day"),
         forecast_tomorrow=(forecast.get("tomorrow") or {}).get("day"),
         production_clamp_id=prod_id,
