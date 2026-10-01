@@ -97,3 +97,44 @@ if __name__ == "__main__":
     test_parse_year_months()
     test_tier_split()
     print("OK")
+
+
+def test_overlay_energy_statistics():
+    from datetime import date as d
+
+    DailyStat = _api.DailyStat
+    overlay = _api.overlay_energy_statistics
+
+    def fhe(day, prod):
+        return DailyStat(day, prod, 10.0, 2.0, 8.0, prod - 2.0, 50.0, 20.0)
+
+    days = [fhe(d(2026, 9, 25), 8.4), fhe(d(2026, 9, 26), 2.569), fhe(d(2026, 9, 27), 7.3), fhe(d(2026, 9, 28), 5.0)]
+    prod = {d(2026, 9, 25): 8.68, d(2026, 9, 26): 5.43, d(2026, 9, 28): 5.9}
+    imp = {d(2026, 9, 25): 9.0, d(2026, 9, 26): 8.0, d(2026, 9, 27): 11.9, d(2026, 9, 28): 7.0}
+    exp = {d(2026, 9, 25): 2.2, d(2026, 9, 26): 0.9, d(2026, 9, 28): 1.0}
+    out = overlay(days, prod, imp, exp, today=d(2026, 9, 28))
+
+    # 26 sept. : remplacé par les stats HA, valeurs dérivées cohérentes
+    s26 = out[1]
+    assert s26.source == "ha_statistics"
+    assert s26.production_kwh == 5.43
+    assert s26.self_consumption_kwh == 4.53  # prod - injection
+    assert s26.consumption_kwh == 12.53  # autoconso + soutirage
+    assert s26.grid_import_kwh == 8.0 and s26.grid_export_kwh == 0.9
+    assert s26.self_consumption_rate == round(100 * 4.53 / 5.43, 2)
+    # 27 sept. : pas de production HA → on garde FHE
+    assert out[2].source == "fhe" and out[2].production_kwh == 7.3
+    # jour courant : jamais remplacé (statistiques incomplètes)
+    assert out[3].source == "fhe" and out[3].production_kwh == 5.0
+
+
+def test_overlay_rejects_implausible_ha_values():
+    from datetime import date as d
+
+    s = _api.DailyStat(d(2026, 9, 20), 8.0, 12.0, 4.0, 8.0, 4.0, 50.0, 33.0)
+    # injection > production : incohérent, on garde FHE
+    out = _api.overlay_energy_statistics([s], {d(2026, 9, 20): 3.0}, {d(2026, 9, 20): 5.0}, {d(2026, 9, 20): 6.0}, d(2026, 10, 1))
+    assert out[0].source == "fhe"
+    # statistique négative : idem
+    out = _api.overlay_energy_statistics([s], {d(2026, 9, 20): 3.0}, {d(2026, 9, 20): -1.0}, {d(2026, 9, 20): 1.0}, d(2026, 10, 1))
+    assert out[0].source == "fhe"

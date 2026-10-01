@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from functools import partial
 import logging
 
 import voluptuous as vol
@@ -11,11 +12,20 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady, HomeAssistantError
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.util import dt as dt_util
 
-from .api import FheAuthError, FheClient, FheConnectionError
+from .api import (
+    DailyStat,
+    FheAuthError,
+    FheClient,
+    FheConnectionError,
+    overlay_energy_statistics,
+)
 from .const import (
     ATTR_END_DATE,
     ATTR_EXPORT_CAP_KWH,
@@ -104,6 +114,64 @@ async def _async_update_listener(hass: HomeAssistant, entry: FheConfigEntry) -> 
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+async def _async_overlay_ha_statistics(
+    hass: HomeAssistant, entry: FheConfigEntry, days: list[DailyStat]
+) -> list[DailyStat]:
+    """Remplace les jours FHE par les statistiques longue durée de HA si dispo.
+
+    Le portail FHE ne connaît pas les corrections faites dans HA (trou de
+    données comblé après une panne, par exemple). Le bilan lit donc d'abord les
+    statistiques des compteurs « du jour » de cette intégration, et ne retombe
+    sur FHE que pour les jours que HA ne couvre pas.
+    """
+    if not days:
+        return days
+    registry = er.async_get(hass)
+    entity_ids: dict[str, str] = {}
+    for key in ("production_today", "grid_import_today", "grid_export_today"):
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
+        if entity_id is None:
+            return days
+        entity_ids[key] = entity_id
+
+    start_dt = dt_util.start_of_local_day(days[0].day)
+    end_dt = dt_util.start_of_local_day(days[-1].day + timedelta(days=1))
+    try:
+        stats = await get_instance(hass).async_add_executor_job(
+            partial(
+                statistics_during_period,
+                hass,
+                start_dt,
+                end_dt,
+                set(entity_ids.values()),
+                "day",
+                None,
+                {"change"},
+            )
+        )
+    except Exception:  # noqa: BLE001 - le bilan doit sortir même sans statistiques
+        _LOGGER.warning("Statistiques HA indisponibles, bilan calculé avec les données FHE seules", exc_info=True)
+        return days
+
+    def _by_day(key: str) -> dict[date, float]:
+        out: dict[date, float] = {}
+        for row in stats.get(entity_ids[key], []):
+            change = row.get("change")
+            if change is None:
+                continue
+            day = dt_util.as_local(dt_util.utc_from_timestamp(row["start"])).date()
+            out[day] = float(change)
+        return out
+
+    return overlay_energy_statistics(
+        days,
+        _by_day("production_today"),
+        _by_day("grid_import_today"),
+        _by_day("grid_export_today"),
+        dt_util.now().date(),
+    )
+
+
 def _async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, SERVICE_WEEKLY_REPORT):
         return
@@ -152,6 +220,8 @@ def _async_register_services(hass: HomeAssistant) -> None:
         except FheConnectionError as err:
             raise HomeAssistantError(f"FHE injoignable : {err}") from err
 
+        days = await _async_overlay_ha_statistics(hass, entry, days)
+
         prod = sum(d.production_kwh for d in days)
         conso = sum(d.consumption_kwh for d in days)
         self_kwh = sum(d.self_consumption_kwh for d in days)
@@ -172,6 +242,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "days_count": len(days),
+            "days_from_ha_statistics": sum(1 for d in days if d.source == "ha_statistics"),
             "production_kwh": round(prod, 2),
             "consumption_kwh": round(conso, 2),
             "self_consumption_kwh": round(self_kwh, 2),
@@ -204,6 +275,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     "grid_export_kwh": d.grid_export_kwh,
                     "self_consumption_rate": d.self_consumption_rate,
                     "self_sufficiency_rate": d.self_sufficiency_rate,
+                    "source": d.source,
                 }
                 for d in days
             ],

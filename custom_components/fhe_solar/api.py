@@ -94,6 +94,9 @@ class DailyStat:
     grid_export_kwh: float
     self_consumption_rate: float | None
     self_sufficiency_rate: float | None
+    # "fhe" : valeurs du portail FHE ; "ha_statistics" : statistiques longue
+    # durée de Home Assistant (corrigées/complétées après une panne par ex.).
+    source: str = "fhe"
 
 
 class FheClient:
@@ -387,6 +390,56 @@ def _parse_month_days(
             )
         )
     return results
+
+
+def overlay_energy_statistics(
+    days: list[DailyStat],
+    production: dict[date, float],
+    grid_import: dict[date, float],
+    grid_export: dict[date, float],
+    today: date,
+) -> list[DailyStat]:
+    """Remplace les jours FHE par les statistiques de HA quand elles existent.
+
+    Les trois séries sont celles du tableau de bord Énergie de HA (production,
+    soutirage, injection). L'autoconsommation et la consommation en sont
+    déduites (prod = auto + injection ; conso = auto + soutirage), ce qui garde
+    le bilan cohérent avec ce que HA affiche. Un jour n'est remplacé que si les
+    trois séries le couvrent, s'il est terminé et si les valeurs sont plausibles ;
+    sinon la valeur FHE est conservée.
+    """
+    out: list[DailyStat] = []
+    for stat in days:
+        d = stat.day
+        prod = production.get(d)
+        imp = grid_import.get(d)
+        exp = grid_export.get(d)
+        if (
+            d >= today
+            or prod is None
+            or imp is None
+            or exp is None
+            or min(prod, imp, exp) < 0
+            or exp > prod + 0.05
+        ):
+            out.append(stat)
+            continue
+        self_kwh = max(prod - exp, 0.0)
+        conso = self_kwh + imp
+        out.append(
+            DailyStat(
+                day=d,
+                production_kwh=round(prod, 3),
+                consumption_kwh=round(conso, 3),
+                self_consumption_kwh=round(self_kwh, 3),
+                grid_import_kwh=round(imp, 3),
+                grid_export_kwh=round(exp, 3),
+                self_consumption_rate=round(100 * self_kwh / prod, 2) if prod else None,
+                self_sufficiency_rate=round(100 * self_kwh / conso, 2) if conso else None,
+                source="ha_statistics",
+            )
+        )
+    return out
 
 
 def _parse_year_months(data: dict[str, Any]) -> dict[int, float]:
