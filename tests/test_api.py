@@ -138,3 +138,29 @@ def test_overlay_rejects_implausible_ha_values():
     # statistique négative : idem
     out = _api.overlay_energy_statistics([s], {d(2026, 9, 20): 3.0}, {d(2026, 9, 20): -1.0}, {d(2026, 9, 20): 1.0}, d(2026, 10, 1))
     assert out[0].source == "fhe"
+
+
+def test_login_timeout_is_a_connection_error():
+    """Réseau pas prêt au démarrage : l'intégration doit réessayer, pas rester en erreur."""
+    import asyncio
+
+    class _Hang:
+        async def __aenter__(self):
+            raise TimeoutError()
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class _Session:
+        def get(self, *a, **k):
+            return _Hang()
+
+        post = get
+
+    client = _api.FheClient(_Session(), "user@example.com", "x")
+    try:
+        asyncio.run(client.login())
+    except _api.FheConnectionError:
+        pass
+    else:
+        raise AssertionError("FheConnectionError attendue")

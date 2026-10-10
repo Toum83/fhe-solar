@@ -156,7 +156,7 @@ class FheOptionsFlow(OptionsFlow):
                     default=options.get(CONF_PRICE_IMPORT, DEFAULT_PRICE_IMPORT),
                 ): NumberSelector(
                     NumberSelectorConfig(
-                        min=0, max=2, step=0.0001, unit_of_measurement="€/kWh",
+                        min=0, max=2, step="any", unit_of_measurement="€/kWh",
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
@@ -165,7 +165,7 @@ class FheOptionsFlow(OptionsFlow):
                     default=options.get(CONF_PRICE_EXPORT, DEFAULT_PRICE_EXPORT),
                 ): NumberSelector(
                     NumberSelectorConfig(
-                        min=0, max=2, step=0.0001, unit_of_measurement="€/kWh",
+                        min=0, max=2, step="any", unit_of_measurement="€/kWh",
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
@@ -174,7 +174,7 @@ class FheOptionsFlow(OptionsFlow):
                     default=options.get(CONF_PRICE_EXPORT_ABOVE, DEFAULT_PRICE_EXPORT_ABOVE),
                 ): NumberSelector(
                     NumberSelectorConfig(
-                        min=0, max=2, step=0.0001, unit_of_measurement="€/kWh",
+                        min=0, max=2, step="any", unit_of_measurement="€/kWh",
                         mode=NumberSelectorMode.BOX,
                     )
                 ),

@@ -149,8 +149,11 @@ class FheClient:
                 if resp.status != 200:
                     raise FheConnectionError(f"Login HTTP {resp.status}")
                 body = await resp.json(content_type=None)
-        except aiohttp.ClientError as err:
-            raise FheConnectionError(f"Login impossible: {err}") from err
+        # TimeoutError n'est pas un aiohttp.ClientError : sans lui, un réseau pas encore prêt au
+        # démarrage de HA (DNS en délai dépassé, 08/10/2026) laissait l'intégration en erreur
+        # définitive au lieu de la faire réessayer (ConfigEntryNotReady).
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise FheConnectionError(f"Login impossible: {err!r}") from err
         except ValueError as err:
             raise FheConnectionError("Réponse de login non JSON") from err
 
@@ -190,8 +193,8 @@ class FheClient:
                     if "json" not in ctype:
                         raise FheConnectionError(f"GET {path} → réponse non JSON ({ctype})")
                     return await resp.json(content_type=None)
-            except aiohttp.ClientError as err:
-                raise FheConnectionError(f"GET {path}: {err}") from err
+            except (aiohttp.ClientError, TimeoutError) as err:
+                raise FheConnectionError(f"GET {path}: {err!r}") from err
         raise FheConnectionError(f"GET {path}: échec inattendu")
 
     # ------------------------------------------------------------- dashboard
