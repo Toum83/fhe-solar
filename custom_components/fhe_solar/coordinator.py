@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import DashboardData, FheAuthError, FheClient, FheConnectionError
 from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .hour_lag import HourLagCompensator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         )
         self.client = client
         self._last_day = None
+        self._lag = HourLagCompensator()
 
     async def _async_update_data(self) -> DashboardData:
         try:
@@ -51,9 +53,25 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         except FheConnectionError as err:
             raise UpdateFailed(str(err)) from err
 
-        today = dt_util.now().date()
+        now = dt_util.now()
+        # FHE publie ses totaux du jour avec une heure de retard : on y ajoute l'heure en
+        # cours, intégrée depuis les puissances (voir hour_lag.py).
+        for name, value in self._lag.update(
+            now,
+            data.production_today,
+            data.consumption_today,
+            data.self_consumption_today,
+            data.consumption_power,
+            data.production_power,
+        ).items():
+            setattr(data, name, value)
+
+        today = now.date()
         previous = self.data
-        if previous is not None and self._last_day == today:
+        # Juste après minuit, FHE peut encore renvoyer les totaux de la veille au premier
+        # relevé : sa remise à zéro qui suit est légitime et ne doit pas être bloquée.
+        midnight_reset = now.hour == 0 and now.minute < 15
+        if previous is not None and self._last_day == today and not midnight_reset:
             # Les compteurs "du jour" sont en state_class total_increasing :
             # HA interpréterait une baisse comme une remise à zéro et gonflerait
             # les statistiques. On ignore donc toute baisse tant que le jour
