@@ -6,8 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
-    SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
 )
@@ -16,11 +16,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from . import FheConfigEntry
 from .api import DashboardData
 from .const import DOMAIN
-from .coordinator import FheCoordinator
+from .coordinator import _DAILY_FIELDS, FheCoordinator
+from .hour_lag import restart_floor
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -136,7 +138,7 @@ async def async_setup_entry(
     async_add_entities(FheSensor(coordinator, entry, desc) for desc in SENSORS)
 
 
-class FheSensor(CoordinatorEntity[FheCoordinator], SensorEntity):
+class FheSensor(CoordinatorEntity[FheCoordinator], RestoreSensor):
     """Capteur alimenté par le coordinateur FHE."""
 
     entity_description: FheSensorDescription
@@ -161,9 +163,28 @@ class FheSensor(CoordinatorEntity[FheCoordinator], SensorEntity):
             configuration_url="https://fhesmart.fhe-france.com/dashboard",
         )
 
+    _floor: float | None = None
+    _floor_day = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self.entity_description.key not in _DAILY_FIELDS:
+            return
+        # Dernière valeur avant le redémarrage, si elle date d'aujourd'hui (voir restart_floor).
+        last_state = await self.async_get_last_state()
+        last_data = await self.async_get_last_sensor_data()
+        if last_state is None or last_data is None:
+            return
+        try:
+            self._floor = float(last_data.native_value)
+        except (TypeError, ValueError):
+            return
+        self._floor_day = dt_util.as_local(last_state.last_changed).date()
+
     @property
     def native_value(self) -> float | None:
-        return self.entity_description.value_fn(self.coordinator.data)
+        value = self.entity_description.value_fn(self.coordinator.data)
+        return restart_floor(value, self._floor, self._floor_day, dt_util.now().date())
 
     @property
     def extra_state_attributes(self) -> dict[str, str] | None:

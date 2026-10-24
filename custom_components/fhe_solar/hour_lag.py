@@ -13,7 +13,7 @@ total publié la contient et l'intégration repart de zéro. Module sans dépend
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 # Au-delà, un trou entre deux relevés n'est pas extrapolé (HA arrêté, FHE indisponible…).
 MAX_GAP = timedelta(minutes=10)
@@ -86,3 +86,17 @@ class HourLagCompensator:
             "grid_import_today": round(max(consumption_c - self_c, 0.0), 3),
             "grid_export_today": round(max(production_c - self_c, 0.0), 3),
         }
+
+
+def restart_floor(value: float | None, floor: float | None, floor_day: date | None, today: date) -> float | None:
+    """Valeur « du jour » protégée contre la baisse qui suit un redémarrage de HA.
+
+    Au redémarrage, la compensation perd l'énergie intégrée depuis la dernière heure publiée
+    par FHE : le total redescend jusqu'à la publication suivante (cas réel du 24/10/2026 :
+    3,833 → 3,459 kWh à 10 h 47). HA prend une baisse de plus de 10 % pour une remise à zéro et
+    ajoute tout le compteur à l'heure en cours (+3,08 kWh de soutirage fantôme). On garde donc la
+    dernière valeur connue du même jour tant que le nouveau total ne l'a pas rattrapée.
+    """
+    if value is None or floor is None or floor_day != today:
+        return value
+    return max(value, floor)

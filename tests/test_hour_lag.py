@@ -63,3 +63,13 @@ def test_demarrage_juste_apres_l_heure_pleine():
     c = HourLagCompensator()
     out = c.update(T(12, 2), 0.0, 5.0, 0.0, 1200.0, 0.0)
     assert out["consumption_today"] == round(5.0 + 1.2 * 62 / 60, 3)  # depuis 11 h
+
+
+def test_redemarrage_ne_fait_pas_baisser_le_total_du_jour():
+    from datetime import date
+    today = date(2026, 10, 24)
+    floor = _mod.restart_floor
+    assert floor(3.459, 3.833, today, today) == 3.833  # après redémarrage : on garde 3,833
+    assert floor(3.969, 3.833, today, today) == 3.969  # FHE a rattrapé : la vraie valeur reprend
+    assert floor(0.1, 3.833, date(2026, 10, 23), today) == 0.1  # valeur de la veille : pas de plancher
+    assert floor(None, 3.833, today, today) is None
