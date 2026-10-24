@@ -13,6 +13,8 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -25,6 +27,7 @@ from .api import FheAuthError, FheClient, FheConnectionError
 from .const import (
     CONF_CONTRACT_ANNIVERSARY,
     CONF_EXPORT_CAP_KWH,
+    CONF_GAZPAR_ENTITY,
     CONF_PRICE_EXPORT,
     CONF_PRICE_EXPORT_ABOVE,
     CONF_PRICE_IMPORT,
@@ -191,6 +194,10 @@ class FheOptionsFlow(OptionsFlow):
                     CONF_CONTRACT_ANNIVERSARY,
                     default=options.get(CONF_CONTRACT_ANNIVERSARY, DEFAULT_CONTRACT_ANNIVERSARY),
                 ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+                vol.Optional(
+                    CONF_GAZPAR_ENTITY,
+                    description={"suggested_value": options.get(CONF_GAZPAR_ENTITY)},
+                ): EntitySelector(EntitySelectorConfig(domain="sensor")),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

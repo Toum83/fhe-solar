@@ -37,7 +37,8 @@
           "price_export": "Surplus buy-back price",
           "price_export_above": "Buy-back price above the cap",
           "export_cap_kwh": "Annual buy-back cap",
-          "contract_anniversary": "Contract year start (MM-DD)"
+          "contract_anniversary": "Contract year start (MM-DD)",
+          "gazpar_entity": "Gazpar sensor (gas on the real day)"
         },
         "data_description": {
           "scan_interval": "Minutes between two polls of the FHE portal.",
@@ -45,7 +46,8 @@
           "price_export": "Used to value exported kWh in the weekly report.",
           "price_export_above": "Applied to kWh exported past the cap.",
           "export_cap_kwh": "Volume bought back at the standard price per contract year.",
-          "contract_anniversary": "Date the cap resets, MM-DD (01-01 = calendar year)."
+          "contract_anniversary": "Date the cap resets, MM-DD (01-01 = calendar year).",
+          "gazpar_entity": "Optional. Sensor of the GrDF Gazpar integration (with the daily attribute): creates the statistic \"Gaz GRDF (jour réel)\", where each day is stored at its real date despite GRDF's publication delay. Then pick it as the gas source in the Energy dashboard."
         }
       }
     }

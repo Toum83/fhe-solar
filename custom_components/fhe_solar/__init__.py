@@ -35,6 +35,7 @@ from .const import (
     ATTR_START_DATE,
     CONF_CONTRACT_ANNIVERSARY,
     CONF_EXPORT_CAP_KWH,
+    CONF_GAZPAR_ENTITY,
     CONF_PRICE_EXPORT,
     CONF_PRICE_EXPORT_ABOVE,
     CONF_PRICE_IMPORT,
@@ -47,6 +48,7 @@ from .const import (
     SERVICE_WEEKLY_REPORT,
 )
 from .coordinator import FheCoordinator
+from .gas_real_day import async_setup_gas_real_day
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,6 +98,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FheConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    if gazpar := entry.options.get(CONF_GAZPAR_ENTITY):
+        entry.async_on_unload(async_setup_gas_real_day(hass, gazpar))
 
     _async_register_services(hass)
     return True
