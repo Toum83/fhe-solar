@@ -14,6 +14,9 @@ CONF_EXPORT_CAP_KWH = "export_cap_kwh"
 CONF_CONTRACT_ANNIVERSARY = "contract_anniversary"
 # Capteur de l'intégration Gazpar (attribut daily) : facultatif, active la statistique gaz au jour réel.
 CONF_GAZPAR_ENTITY = "gazpar_entity"
+CONF_GAS_PRICE = "gas_price"
+# Prix du kWh de gaz TTC hors abonnement (facture EDF, octobre 2026) : sert à la statistique de coût.
+DEFAULT_GAS_PRICE = 0.113
 
 DEFAULT_SCAN_INTERVAL = 5  # minutes
 MIN_SCAN_INTERVAL = 1

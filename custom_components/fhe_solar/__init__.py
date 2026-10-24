@@ -35,12 +35,14 @@ from .const import (
     ATTR_START_DATE,
     CONF_CONTRACT_ANNIVERSARY,
     CONF_EXPORT_CAP_KWH,
+    CONF_GAS_PRICE,
     CONF_GAZPAR_ENTITY,
     CONF_PRICE_EXPORT,
     CONF_PRICE_EXPORT_ABOVE,
     CONF_PRICE_IMPORT,
     DEFAULT_CONTRACT_ANNIVERSARY,
     DEFAULT_EXPORT_CAP_KWH,
+    DEFAULT_GAS_PRICE,
     DEFAULT_PRICE_EXPORT,
     DEFAULT_PRICE_EXPORT_ABOVE,
     DEFAULT_PRICE_IMPORT,
@@ -99,7 +101,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FheConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     if gazpar := entry.options.get(CONF_GAZPAR_ENTITY):
-        entry.async_on_unload(async_setup_gas_real_day(hass, gazpar))
+        price = entry.options.get(CONF_GAS_PRICE, DEFAULT_GAS_PRICE)
+        entry.async_on_unload(async_setup_gas_real_day(hass, gazpar, price))
 
     _async_register_services(hass)
     return True

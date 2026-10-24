@@ -27,6 +27,7 @@ from .api import FheAuthError, FheClient, FheConnectionError
 from .const import (
     CONF_CONTRACT_ANNIVERSARY,
     CONF_EXPORT_CAP_KWH,
+    CONF_GAS_PRICE,
     CONF_GAZPAR_ENTITY,
     CONF_PRICE_EXPORT,
     CONF_PRICE_EXPORT_ABOVE,
@@ -34,6 +35,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_CONTRACT_ANNIVERSARY,
     DEFAULT_EXPORT_CAP_KWH,
+    DEFAULT_GAS_PRICE,
     DEFAULT_PRICE_EXPORT,
     DEFAULT_PRICE_EXPORT_ABOVE,
     DEFAULT_PRICE_IMPORT,
@@ -198,6 +200,15 @@ class FheOptionsFlow(OptionsFlow):
                     CONF_GAZPAR_ENTITY,
                     description={"suggested_value": options.get(CONF_GAZPAR_ENTITY)},
                 ): EntitySelector(EntitySelectorConfig(domain="sensor")),
+                vol.Required(
+                    CONF_GAS_PRICE,
+                    default=options.get(CONF_GAS_PRICE, DEFAULT_GAS_PRICE),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0, max=2, step="any", unit_of_measurement="€/kWh",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

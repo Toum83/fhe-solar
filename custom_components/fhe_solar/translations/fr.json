@@ -38,7 +38,8 @@
           "price_export_above": "Prix de rachat au-delà du plafond",
           "export_cap_kwh": "Plafond annuel de rachat",
           "contract_anniversary": "Début de l'année contractuelle (MM-JJ)",
-          "gazpar_entity": "Capteur Gazpar (gaz au jour réel)"
+          "gazpar_entity": "Capteur Gazpar (gaz au jour réel)",
+          "gas_price": "Prix du kWh de gaz"
         },
         "data_description": {
           "scan_interval": "Minutes entre deux interrogations du portail FHE.",
@@ -47,7 +48,8 @@
           "price_export_above": "Tarif appliqué aux kWh injectés après le plafond.",
           "export_cap_kwh": "Volume racheté au tarif principal sur une année contractuelle.",
           "contract_anniversary": "Date de remise à zéro du plafond, au format MM-JJ (01-01 = année civile).",
-          "gazpar_entity": "Facultatif. Capteur de l'intégration GrDF Gazpar (avec l'attribut daily) : crée la statistique « Gaz GRDF (jour réel) », où chaque journée est rangée à sa vraie date malgré le retard de publication de GRDF. À choisir ensuite comme source de gaz dans le tableau Énergie."
+          "gazpar_entity": "Facultatif. Capteur de l'intégration GrDF Gazpar (avec l'attribut daily) : crée la statistique « Gaz GRDF (jour réel) », où chaque journée est rangée à sa vraie date malgré le retard de publication de GRDF. À choisir ensuite comme source de gaz dans le tableau Énergie.",
+          "gas_price": "Sert à la statistique « Gaz GRDF (jour réel) — coût », à choisir comme coût du gaz dans le tableau Énergie."
         }
       }
     }
