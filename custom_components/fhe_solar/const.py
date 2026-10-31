@@ -18,6 +18,11 @@ CONF_GAS_PRICE = "gas_price"
 # Prix du kWh de gaz TTC hors abonnement (facture EDF, octobre 2026) : sert à la statistique de coût.
 DEFAULT_GAS_PRICE = 0.113
 
+# Événement HA émis pour chaque échelon de la courbe de consommation à 7 s (voir steps.py) :
+# ts, power_before, power_after, delta_w, direction (on/off), production_power. Lu par
+# l'automatisation NILM. FHE ne garde que ~58 min de courbe : l'intervalle doit rester en dessous.
+EVENT_POWER_STEP = f"{DOMAIN}_power_step"
+
 DEFAULT_SCAN_INTERVAL = 5  # minutes
 MIN_SCAN_INTERVAL = 1
 MAX_SCAN_INTERVAL = 60

@@ -39,6 +39,29 @@ data:
 response_variable: report
 ```
 
+## Événement `fhe_solar_power_step`
+
+Le tableau de bord FHE renvoie, pour chaque pince, les 500 derniers points de puissance
+(un toutes les 7 s, soit ~58 min). À chaque relevé, l'intégration y repère les échelons de la
+consommation (démarrages / arrêts d'appareils) apparus depuis le relevé précédent et émet un
+événement par échelon, horodaté à 7 s près :
+
+```yaml
+event_type: fhe_solar_power_step
+data:
+  ts: "2026-10-31T15:18:09+00:00"   # premier point au nouveau niveau
+  power_before: 1240
+  power_after: 3503
+  delta_w: 2263
+  direction: "on"                   # ou "off"
+  production_power: 1203
+```
+
+Seuil : 150 W. Une impulsion d'un seul point (four en régulation) donne un démarrage et un arrêt ;
+une pointe suivie d'un palier plus bas (appel de courant d'un moteur) compte pour le palier. Le
+dernier point traité est conservé au redémarrage de HA : jusqu'à ~58 min d'échelons sont rattrapées.
+L'intervalle de relevé doit donc rester sous une heure.
+
 ## Installation
 
 ### Via HACS (dépôt personnalisé)
