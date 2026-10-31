@@ -57,7 +57,7 @@ data:
   production_power: 1203
 ```
 
-Seuil : 150 W. Une impulsion d'un seul point (four en régulation) donne un démarrage et un arrêt ;
+Seuil : 60 W (le NILM applique ensuite son propre seuil, 80 W). Une impulsion d'un seul point (four en régulation) donne un démarrage et un arrêt ;
 une pointe suivie d'un palier plus bas (appel de courant d'un moteur) compte pour le palier. Le
 dernier point traité est conservé au redémarrage de HA : jusqu'à ~58 min d'échelons sont rattrapées.
 L'intervalle de relevé doit donc rester sous une heure.

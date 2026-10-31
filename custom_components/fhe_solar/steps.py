@@ -19,8 +19,12 @@ from dataclasses import dataclass
 
 # Plus petite variation entre deux points qui prolonge un échelon déjà commencé.
 CONTINUE_W = 40
-# Seuil bas : l'automatisation HA applique ensuite input_number.nilm_event_threshold_w.
-MIN_STEP_W = 150
+# Seuil bas : l'automatisation HA applique ensuite input_number.nilm_event_threshold_w (80 W depuis
+# le 31/10/2026). Le bruit de la courbe à 7 s est d'environ ±40 W : 60 W reste au-dessus.
+MIN_STEP_W = 60
+# Sous ce seuil, une impulsion d'un point est du bruit, et un échelon doit tenir sur les 2 points
+# suivants (à la moitié de sa hauteur près) : le fond de la maison oscille parfois de ±80 W en 7 s.
+SMALL_STEP_W = 200
 # Pointe qui redescend d'au moins cette part au point suivant : appel de courant.
 SPIKE_RETURN = 0.6
 # Au-delà, deux points ne sont pas consécutifs (trou dans la courbe FHE) : pas d'échelon à cheval.
@@ -77,7 +81,7 @@ def detect_steps(
         if i + 2 < n and points[i + 2][0] - t1 <= MAX_GAP_MS:
             t2, w2 = points[i + 2]
             if (w2 - w1) * d < 0 and abs(w2 - w0) < MIN_STEP_W:
-                if abs(d) >= MIN_STEP_W:
+                if abs(d) >= SMALL_STEP_W:
                     for ts, a, b in ((t1, w0, w1), (t2, w1, w2)):
                         if after_ms is None or ts > after_ms:
                             steps.append(Step(ts, a, b, production.get(ts)))
@@ -103,7 +107,13 @@ def detect_steps(
             j = i + 2
         before, after = w0, points[j][1]
         ts = points[i + 1][0]
-        if abs(after - before) >= MIN_STEP_W and (after_ms is None or ts > after_ms):
+        height = abs(after - before)
+        if MIN_STEP_W <= height < SMALL_STEP_W:
+            held = points[j + 1 : j + 3]
+            if len(held) < 2 or any(abs(w - after) > height / 2 for _, w in held):
+                i = j
+                continue
+        if height >= MIN_STEP_W and (after_ms is None or ts > after_ms):
             steps.append(Step(ts, before, after, production.get(ts)))
         i = j
     return steps

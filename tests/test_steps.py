@@ -73,3 +73,18 @@ def test_production_au_meme_instant():
 
 def test_parse_serie_trie_et_ignore_les_points_invalides():
     assert parse_serie([{"x": 2, "y": 5}, {"x": 1, "y": "4"}, {"x": 3}, None and {}]) == [(1, 4.0), (2, 5.0)]
+
+
+def test_demarrage_d_un_pc_au_dessus_du_bruit():
+    # 31/10/2026 20 h 42 : PC allumé, +115 W ; le bruit de ±40 W ne donne rien.
+    s = detect_steps(curve(326, 340, 318, 441, 430, 452, 421), None)
+    assert [(x.power_before, x.power_after) for x in s] == [(318, 441)]
+
+
+def test_petite_impulsion_de_bruit_ignoree():
+    # Fond à 1,2 kW qui oscille (31/10/2026 15 h 55) : +152 W sur un seul point.
+    assert detect_steps(curve(1215, 1367, 1219, 1161, 1163), None) == []
+
+
+def test_petit_echelon_qui_ne_tient_pas_ignore():
+    assert detect_steps(curve(300, 300, 420, 330, 310, 300), None) == []
