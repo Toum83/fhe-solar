@@ -6,7 +6,7 @@ from datetime import timedelta
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
@@ -105,6 +105,10 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         }
         conso = parse_serie((lines.get(data.consumption_clamp_id) or {}).get("serie"))
         if not conso:
+            return
+        # Au démarrage de HA, le 1er relevé arrive avant que les automatisations écoutent : on
+        # n'émet rien et on n'avance pas, le relevé suivant rattrape l'heure entière.
+        if self.hass.state is not CoreState.running:
             return
         prod = dict(parse_serie((lines.get(data.production_clamp_id) or {}).get("serie")))
         if not self._steps_loaded:

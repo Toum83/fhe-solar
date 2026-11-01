@@ -76,7 +76,8 @@ data:
 ```
 
 Au tout premier relevé (et après une coupure de moins d'une heure), toute l'heure conservée par
-FHE est envoyée.
+FHE est envoyée. Pendant le démarrage de HA, rien n'est émis (les automatisations n'écoutent pas
+encore) : le relevé suivant rattrape tout, pour cet événement comme pour `fhe_solar_power_step`.
 
 ## Installation
 
