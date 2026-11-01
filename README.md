@@ -62,6 +62,22 @@ une pointe suivie d'un palier plus bas (appel de courant d'un moteur) compte pou
 dernier point traité est conservé au redémarrage de HA : jusqu'à ~58 min d'échelons sont rattrapées.
 L'intervalle de relevé doit donc rester sous une heure.
 
+## Événement `fhe_solar_power_curve`
+
+À chaque relevé, les points bruts de la courbe à 7 s apparus depuis le relevé précédent, pour
+les archiver (FHE n'en garde qu'une heure) :
+
+```yaml
+event_type: fhe_solar_power_curve
+data:
+  points:                           # [horodatage ms, conso W, production W ou null]
+    - [1793460000000, 1240, 1203]
+    - [1793460007000, 3503, 1198]
+```
+
+Au tout premier relevé (et après une coupure de moins d'une heure), toute l'heure conservée par
+FHE est envoyée.
+
 ## Installation
 
 ### Via HACS (dépôt personnalisé)

@@ -13,9 +13,9 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .api import DashboardData, FheAuthError, FheClient, FheConnectionError
-from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, EVENT_POWER_STEP
+from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, EVENT_POWER_CURVE, EVENT_POWER_STEP
 from .hour_lag import HourLagCompensator
-from .steps import detect_steps, parse_serie
+from .steps import detect_steps, new_curve_points, parse_serie
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +50,8 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         # l'heure que FHE conserve, sans renvoyer deux fois les mêmes échelons.
         self._steps_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.power_steps")
         self._steps_after_ms: int | None = None
+        # Dernier point de la courbe déjà émis pour l'archive (événement fhe_solar_power_curve).
+        self._curve_after_ms: int | None = None
         self._steps_loaded = False
 
     async def _async_update_data(self) -> DashboardData:
@@ -108,7 +110,12 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         if not self._steps_loaded:
             stored = await self._steps_store.async_load() or {}
             self._steps_after_ms = stored.get("after_ms")
+            self._curve_after_ms = stored.get("curve_after_ms")
             self._steps_loaded = True
+        points = new_curve_points(conso, prod, self._curve_after_ms)
+        if points:
+            self.hass.bus.async_fire(EVENT_POWER_CURVE, {"points": points})
+            self._curve_after_ms = points[-1][0]
         # Les 2 derniers points attendent le relevé suivant : une pointe ou un échelon étalé ne se
         # juge qu'avec les points qui suivent.
         cutoff = conso[-3][0] if len(conso) >= 3 else conso[0][0]
@@ -131,4 +138,6 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
                     },
                 )
             self._steps_after_ms = max(self._steps_after_ms, cutoff)
-        self._steps_store.async_delay_save(lambda: {"after_ms": self._steps_after_ms}, 10)
+        self._steps_store.async_delay_save(
+            lambda: {"after_ms": self._steps_after_ms, "curve_after_ms": self._curve_after_ms}, 10
+        )

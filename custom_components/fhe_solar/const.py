@@ -22,6 +22,8 @@ DEFAULT_GAS_PRICE = 0.113
 # ts, power_before, power_after, delta_w, direction (on/off), production_power. Lu par
 # l'automatisation NILM. FHE ne garde que ~58 min de courbe : l'intervalle doit rester en dessous.
 EVENT_POWER_STEP = f"{DOMAIN}_power_step"
+# Points bruts de la courbe à 7 s (conso + prod) depuis le relevé précédent, pour archivage.
+EVENT_POWER_CURVE = f"{DOMAIN}_power_curve"
 
 DEFAULT_SCAN_INTERVAL = 5  # minutes
 MIN_SCAN_INTERVAL = 1

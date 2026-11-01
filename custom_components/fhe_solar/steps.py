@@ -117,3 +117,21 @@ def detect_steps(
             steps.append(Step(ts, before, after, production.get(ts)))
         i = j
     return steps
+
+
+def new_curve_points(
+    conso: list[tuple[int, float]],
+    production: dict[int, float],
+    after_ms: int | None,
+) -> list[list[int | None]]:
+    """Points de la courbe postérieurs à ``after_ms``, en ``[ms, conso W, prod W ou None]``.
+
+    Format compact pour l'archive (une ligne par point à 7 s côté Supabase). Sans ``after_ms``
+    (premier relevé), toute l'heure que FHE conserve est renvoyée.
+    """
+    return [
+        [ts, round(w), None if production.get(ts) is None else round(production[ts])]
+        for ts, w in conso
+        if after_ms is None or ts > after_ms
+    ]
+

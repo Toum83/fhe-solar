@@ -10,7 +10,7 @@ _spec = importlib.util.spec_from_file_location(
 _mod = importlib.util.module_from_spec(_spec)
 sys.modules["steps"] = _mod  # requis par @dataclass
 _spec.loader.exec_module(_mod)
-detect_steps, parse_serie = _mod.detect_steps, _mod.parse_serie
+detect_steps, parse_serie, new_curve_points = _mod.detect_steps, _mod.parse_serie, _mod.new_curve_points
 
 T0 = 1_793_460_000_000
 
@@ -88,3 +88,13 @@ def test_petite_impulsion_de_bruit_ignoree():
 
 def test_petit_echelon_qui_ne_tient_pas_ignore():
     assert detect_steps(curve(300, 300, 420, 330, 310, 300), None) == []
+
+
+def test_curve_points_after_last_sent():
+    conso = curve(300, 310.4, 2290)
+    prod = {T0: 1200.6, T0 + 7000: 1180}
+    assert new_curve_points(conso, prod, T0) == [[T0 + 7000, 310, 1180], [T0 + 14000, 2290, None]]
+
+
+def test_curve_points_first_run_sends_whole_hour():
+    assert len(new_curve_points(curve(*[300] * 500), {}, None)) == 500
