@@ -10,12 +10,19 @@ les échelons (démarrages / arrêts), envoyés ensuite au NILM par un événeme
 - Une impulsion d'un seul point qui revient au niveau de départ donne un démarrage et un arrêt.
 - Une pointe suivie d'un palier plus bas (appel de courant d'un moteur) : le palier compte.
 
+Depuis la 0.6.0, les échelons sont cherchés sur la puissance de la MAISON, reconstruite par
+``house_series`` : la pince « Consommation » du Drive&Elec mesure en fait l'échange avec le réseau
+(maison − production). Constaté le 10/11/2026 : quand la production varie, la « consommation »
+varie d'autant en sens inverse (pente −0,96 à −0,99), et au soleil elle est inférieure à ce que
+mesure une prise connectée sur le lave-vaisselle seul. Chaque éclaircie fabriquait de faux arrêts.
+
 Module sans dépendance à HA (testé seul).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 # Plus petite variation entre deux points qui prolonge un échelon déjà commencé.
 CONTINUE_W = 40
@@ -29,6 +36,19 @@ SMALL_STEP_W = 200
 SPIKE_RETURN = 0.6
 # Au-delà, deux points ne sont pas consécutifs (trou dans la courbe FHE) : pas d'échelon à cheval.
 MAX_GAP_MS = 60_000
+
+
+# La pince « Production » lit ~120 W dès que l'onduleur est sous tension, sans puissance réelle :
+# 117–123 W pendant une heure au crépuscule, puis 0 (seuil d'affichage FHE à 100 W). On retire ce
+# plancher en quadrature (courant réactif), ce qui raccorde sans saut au lever et au coucher.
+PROD_FLOOR_W = 120.0
+# Quand la maison injecte (production > consommation), FHE répète la dernière valeur de conso au
+# watt près : jusqu'à 361 points de suite le 06/11/2026, jamais plus de 9 sans production. À partir
+# de 4 valeurs identiques sous production, la maison est tenue pour inconnue : niveau maintenu.
+FREEZE_MIN_POINTS = 4
+# Points de fin de courbe laissés au relevé suivant : 2 pour juger une pointe ou un échelon étalé,
+# plus de quoi savoir si une suite de valeurs identiques est un gel.
+PENDING_POINTS = 2 + FREEZE_MIN_POINTS
 
 
 @dataclass
@@ -52,6 +72,43 @@ def parse_serie(serie: list[dict] | None) -> list[tuple[int, float]]:
         except (KeyError, TypeError, ValueError):
             continue
     return sorted(out.items())
+
+
+def effective_production(watts: float) -> float:
+    """Production réelle estimée à partir de la lecture de la pince (plancher réactif retiré)."""
+    return math.sqrt(max(watts * watts - PROD_FLOOR_W * PROD_FLOOR_W, 0.0))
+
+
+def house_series(
+    conso: list[tuple[int, float]], production: dict[int, float] | None
+) -> list[tuple[int, float]]:
+    """Puissance de la maison : échange réseau + production, niveau maintenu pendant l'injection.
+
+    ``conso`` est la courbe de la pince « Consommation » (en réalité le soutirage). Tant que la
+    maison soutire, maison = conso + production. Pendant une injection, FHE fige la conso : la
+    maison vaut alors moins que la production, sans qu'on sache combien. On garde le niveau du
+    premier point de la suite figée, ce qui n'invente aucun échelon ; l'écart réel apparaît en un
+    seul échelon à la reprise du soutirage.
+    """
+    production = production or {}
+    out: list[tuple[int, float]] = []
+    last_prod = 0.0
+    i, n = 0, len(conso)
+    while i < n:
+        j = i
+        while j + 1 < n and conso[j + 1][1] == conso[i][1] and conso[j + 1][0] - conso[j][0] <= MAX_GAP_MS:
+            j += 1
+        prods = []
+        for k in range(i, j + 1):
+            last_prod = production.get(conso[k][0], last_prod)
+            prods.append(effective_production(last_prod))
+        if j - i + 1 >= FREEZE_MIN_POINTS and min(prods) > 0:
+            held = conso[i][1] + prods[0]
+            out.extend((conso[k][0], held) for k in range(i, j + 1))
+        else:
+            out.extend((conso[k][0], conso[k][1] + p) for k, p in zip(range(i, j + 1), prods))
+        i = j + 1
+    return out
 
 
 def detect_steps(

@@ -15,7 +15,7 @@ from homeassistant.util import dt as dt_util
 from .api import DashboardData, FheAuthError, FheClient, FheConnectionError
 from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, EVENT_POWER_CURVE, EVENT_POWER_STEP
 from .hour_lag import HourLagCompensator
-from .steps import detect_steps, new_curve_points, parse_serie
+from .steps import PENDING_POINTS, detect_steps, house_series, new_curve_points, parse_serie
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         return data
 
     async def _async_fire_power_steps(self, data: DashboardData) -> None:
-        """Envoie un événement HA par échelon nouveau de la courbe de consommation à 7 s."""
+        """Envoie un événement HA par échelon nouveau de la puissance maison (courbe à 7 s)."""
         lines = {
             f"{line.get('drive_elec_mac')}_{line.get('code')}": line
             for line in (data.raw or {}).get("drive_elec_lines") or []
@@ -120,14 +120,16 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         if points:
             self.hass.bus.async_fire(EVENT_POWER_CURVE, {"points": points})
             self._curve_after_ms = points[-1][0]
-        # Les 2 derniers points attendent le relevé suivant : une pointe ou un échelon étalé ne se
-        # juge qu'avec les points qui suivent.
-        cutoff = conso[-3][0] if len(conso) >= 3 else conso[0][0]
+        # Les derniers points attendent le relevé suivant : une pointe, un échelon étalé ou un gel
+        # de la conso (injection) ne se jugent qu'avec les points qui suivent.
+        cutoff = conso[-PENDING_POINTS - 1][0] if len(conso) > PENDING_POINTS else conso[0][0]
+        # Échelons cherchés sur la puissance de la maison (conso FHE = soutirage, voir steps.py).
+        house = house_series(conso, prod)
         if self._steps_after_ms is None:
             # Toute première fois : on part de maintenant, sans renvoyer l'heure passée.
             self._steps_after_ms = cutoff
         else:
-            for step in detect_steps(conso, self._steps_after_ms, prod):
+            for step in detect_steps(house, self._steps_after_ms, prod):
                 if step.ts_ms > cutoff:
                     break
                 self.hass.bus.async_fire(
@@ -139,6 +141,7 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
                         "delta_w": step.delta_w,
                         "direction": "on" if step.delta_w > 0 else "off",
                         "production_power": step.production_power,
+                        "signal": "house",
                     },
                 )
             self._steps_after_ms = max(self._steps_after_ms, cutoff)

@@ -11,6 +11,7 @@ _mod = importlib.util.module_from_spec(_spec)
 sys.modules["steps"] = _mod  # requis par @dataclass
 _spec.loader.exec_module(_mod)
 detect_steps, parse_serie, new_curve_points = _mod.detect_steps, _mod.parse_serie, _mod.new_curve_points
+house_series, effective_production = _mod.house_series, _mod.effective_production
 
 T0 = 1_793_460_000_000
 
@@ -98,3 +99,50 @@ def test_curve_points_after_last_sent():
 
 def test_curve_points_first_run_sends_whole_hour():
     assert len(new_curve_points(curve(*[300] * 500), {}, None)) == 500
+
+
+def prod_of(*levels):
+    return {T0 + i * 7000: float(w) for i, w in enumerate(levels)}
+
+
+def test_maison_eclaircie_sous_une_chauffe_sans_echelon():
+    # 05/11/2026 : chauffe-eau en marche, la production saute de 240 à 1 150 W, la conso FHE
+    # (soutirage) plonge d'autant. Sur la conso seule : un faux arrêt puis un faux démarrage.
+    conso = curve(1990, 1985, 1080, 1075, 1070, 1985, 1990, 1988)
+    prod = prod_of(240, 245, 1150, 1155, 1160, 245, 240, 242)
+    assert len(detect_steps(conso, None, prod)) == 2
+    assert detect_steps(house_series(conso, prod), None, prod) == []
+
+
+def test_maison_echelon_a_sa_vraie_taille_au_soleil():
+    # Chauffe du lave-vaisselle (2 100 W à la prise) démarrée pendant une injection : la conso FHE
+    # passait de 279 W figés à 1 850 W, soit un échelon raboté à ~1 570 W.
+    conso = curve(279, 279, 279, 279, 279, 1850, 1848, 1852, 1850)
+    prod = prod_of(440, 445, 450, 448, 452, 450, 449, 451, 450)
+    s = detect_steps(house_series(conso, prod), None, prod)
+    assert len(s) == 1 and s[0].delta_w > 1550
+    assert s[0].power_before == 279 + effective_production(440)
+
+
+def test_maison_gel_pendant_l_injection_niveau_maintenu():
+    conso = curve(300, 290, 279, 279, 279, 279, 279, 279, 285, 295)
+    prod = prod_of(250, 260, 300, 420, 535, 610, 480, 330, 300, 290)
+    h = house_series(conso, prod)
+    held = 279 + effective_production(300)
+    assert [w for _, w in h[2:8]] == [held] * 6
+    assert detect_steps(h, None, prod) == []
+
+
+def test_maison_sans_production_identique_a_la_conso():
+    conso = curve(250, 250, 250, 250, 250, 2250, 2250, 250)
+    assert house_series(conso, {}) == conso
+    assert house_series(conso, prod_of(0, 0, 0, 0, 0, 0, 0, 0)) == conso
+
+
+def test_maison_plancher_de_production_au_crepuscule():
+    # La pince production lit ~120 W puis 0 d'un coup (seuil FHE) : pas d'échelon dans la maison.
+    conso = curve(400, 402, 398, 401, 399, 400, 403, 397)
+    prod = prod_of(121, 120, 119, 118, 0, 0, 0, 0)
+    h = house_series(conso, prod)
+    assert max(w for _, w in h) - min(w for _, w in h) < 30
+    assert detect_steps(h, None, prod) == []
