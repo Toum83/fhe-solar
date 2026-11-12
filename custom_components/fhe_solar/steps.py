@@ -16,6 +16,11 @@ Depuis la 0.6.0, les échelons sont cherchés sur la puissance de la MAISON, rec
 varie d'autant en sens inverse (pente −0,96 à −0,99), et au soleil elle est inférieure à ce que
 mesure une prise connectée sur le lave-vaisselle seul. Chaque éclaircie fabriquait de faux arrêts.
 
+Depuis la 0.7.0, la conso est corrigée de sa part réactive (``real_consumption``) : la pince
+mesure une puissance apparente, juste à forte charge mais double près du fond. Comparé à Linky
+(Hello Watt) les 05 et 10/11/2026 : 240 W lus la nuit pour 120 W réels, soutirage du jour 14,72
+et 11,45 kWh lus pour 12,76 et 9,36 réels. Avec Q = 210 var : 12,89 et 9,45 kWh (±1 %).
+
 Module sans dépendance à HA (testé seul).
 """
 
@@ -42,6 +47,8 @@ MAX_GAP_MS = 60_000
 # 117–123 W pendant une heure au crépuscule, puis 0 (seuil d'affichage FHE à 100 W). On retire ce
 # plancher en quadrature (courant réactif), ce qui raccorde sans saut au lever et au coucher.
 PROD_FLOOR_W = 120.0
+# Puissance réactive vue par la pince « Consommation » (var), retirée en quadrature.
+CONSO_REACTIVE_VAR = 210.0
 # Quand la maison injecte (production > consommation), FHE répète la dernière valeur de conso au
 # watt près : jusqu'à 361 points de suite le 06/11/2026, jamais plus de 9 sans production. À partir
 # de 4 valeurs identiques sous production, la maison est tenue pour inconnue : niveau maintenu.
@@ -79,19 +86,15 @@ def effective_production(watts: float) -> float:
     return math.sqrt(max(watts * watts - PROD_FLOOR_W * PROD_FLOOR_W, 0.0))
 
 
-def house_series(
-    conso: list[tuple[int, float]], production: dict[int, float] | None
-) -> list[tuple[int, float]]:
-    """Puissance de la maison : échange réseau + production, niveau maintenu pendant l'injection.
+def real_consumption(watts: float) -> float:
+    """Soutirage réel estimé à partir de la lecture de la pince (part réactive retirée)."""
+    return math.sqrt(max(watts * watts - CONSO_REACTIVE_VAR * CONSO_REACTIVE_VAR, 0.0))
 
-    ``conso`` est la courbe de la pince « Consommation » (en réalité le soutirage). Tant que la
-    maison soutire, maison = conso + production. Pendant une injection, FHE fige la conso : la
-    maison vaut alors moins que la production, sans qu'on sache combien. On garde le niveau du
-    premier point de la suite figée, ce qui n'invente aucun échelon ; l'écart réel apparaît en un
-    seul échelon à la reprise du soutirage.
-    """
+
+def frozen_flags(conso: list[tuple[int, float]], production: dict[int, float] | None) -> list[bool]:
+    """Points où la conso est figée sous production (la maison injecte, voir FREEZE_MIN_POINTS)."""
     production = production or {}
-    out: list[tuple[int, float]] = []
+    flags = [False] * len(conso)
     last_prod = 0.0
     i, n = 0, len(conso)
     while i < n:
@@ -103,12 +106,76 @@ def house_series(
             last_prod = production.get(conso[k][0], last_prod)
             prods.append(effective_production(last_prod))
         if j - i + 1 >= FREEZE_MIN_POINTS and min(prods) > 0:
-            held = conso[i][1] + prods[0]
-            out.extend((conso[k][0], held) for k in range(i, j + 1))
-        else:
-            out.extend((conso[k][0], conso[k][1] + p) for k, p in zip(range(i, j + 1), prods))
+            for k in range(i, j + 1):
+                flags[k] = True
         i = j + 1
+    return flags
+
+
+def house_series(
+    conso: list[tuple[int, float]], production: dict[int, float] | None
+) -> list[tuple[int, float]]:
+    """Puissance de la maison : soutirage réel + production, niveau maintenu pendant l'injection.
+
+    ``conso`` est la courbe de la pince « Consommation » (en réalité le soutirage, en puissance
+    apparente). Tant que la maison soutire, maison = soutirage réel + production. Pendant une
+    injection, FHE fige la conso : la maison vaut alors moins que la production, sans qu'on sache
+    combien. On garde le niveau du premier point de la suite figée, ce qui n'invente aucun
+    échelon ; l'écart réel apparaît en un seul échelon à la reprise du soutirage.
+    """
+    production = production or {}
+    flags = frozen_flags(conso, production)
+    out: list[tuple[int, float]] = []
+    last_prod = 0.0
+    held: float | None = None
+    for (ts, w), frozen in zip(conso, flags):
+        last_prod = production.get(ts, last_prod)
+        level = real_consumption(w) + effective_production(last_prod)
+        if frozen:
+            if held is None:
+                held = level
+            out.append((ts, held))
+        else:
+            held = None
+            out.append((ts, level))
     return out
+
+
+def curve_energy(
+    conso: list[tuple[int, float]],
+    production: dict[int, float] | None,
+    after_ms: int | None,
+    until_ms: int,
+    house_before: float,
+) -> tuple[float, float, float]:
+    """Énergie échangée avec le réseau entre ``after_ms`` (exclu) et ``until_ms`` (inclus).
+
+    Renvoie (soutirage kWh, injection kWh, dernier niveau connu de la maison en W). Soutirage :
+    conso réelle intégrée hors injection. Injection : pendant que la conso est figée, production
+    moins le dernier niveau connu de la maison (estimation basse : 0,07 kWh pour 0,22 relevés par
+    Linky le 05/11/2026, contre 0,88 pour le capteur FHE). Chaque point compte jusqu'au suivant,
+    au plus 60 s (trou de courbe).
+    """
+    production = production or {}
+    flags = frozen_flags(conso, production)
+    grid_in = grid_out = 0.0
+    house = house_before
+    last_prod = 0.0
+    for i, ((ts, w), frozen) in enumerate(zip(conso, flags)):
+        last_prod = production.get(ts, last_prod)
+        prod = effective_production(last_prod)
+        if not frozen:
+            house = real_consumption(w) + prod
+        if (after_ms is not None and ts <= after_ms) or ts > until_ms or i + 1 >= len(conso):
+            continue
+        hours = min(conso[i + 1][0] - ts, 60_000) / 3_600_000
+        if frozen:
+            grid_out += max(prod - house, 0.0) * hours / 1000
+        else:
+            grid_in += real_consumption(w) * hours / 1000
+    return grid_in, grid_out, house
+
+
 
 
 def detect_steps(

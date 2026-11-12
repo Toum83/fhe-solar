@@ -88,6 +88,15 @@
       },
       "forecast_tomorrow": {
         "name": "Production forecast tomorrow"
+      },
+      "grid_import_curve": {
+        "name": "Grid import (corrected curve)"
+      },
+      "grid_export_curve": {
+        "name": "Grid export (corrected curve)"
+      },
+      "house_power": {
+        "name": "House power"
       }
     }
   },

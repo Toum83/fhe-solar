@@ -12,6 +12,7 @@ sys.modules["steps"] = _mod  # requis par @dataclass
 _spec.loader.exec_module(_mod)
 detect_steps, parse_serie, new_curve_points = _mod.detect_steps, _mod.parse_serie, _mod.new_curve_points
 house_series, effective_production = _mod.house_series, _mod.effective_production
+real_consumption, curve_energy = _mod.real_consumption, _mod.curve_energy
 
 T0 = 1_793_460_000_000
 
@@ -121,22 +122,51 @@ def test_maison_echelon_a_sa_vraie_taille_au_soleil():
     prod = prod_of(440, 445, 450, 448, 452, 450, 449, 451, 450)
     s = detect_steps(house_series(conso, prod), None, prod)
     assert len(s) == 1 and s[0].delta_w > 1550
-    assert s[0].power_before == 279 + effective_production(440)
+    assert s[0].power_before == real_consumption(279) + effective_production(440)
 
 
 def test_maison_gel_pendant_l_injection_niveau_maintenu():
     conso = curve(300, 290, 279, 279, 279, 279, 279, 279, 285, 295)
     prod = prod_of(250, 260, 300, 420, 535, 610, 480, 330, 300, 290)
     h = house_series(conso, prod)
-    held = 279 + effective_production(300)
+    held = real_consumption(279) + effective_production(300)
     assert [w for _, w in h[2:8]] == [held] * 6
     assert detect_steps(h, None, prod) == []
 
 
-def test_maison_sans_production_identique_a_la_conso():
+def test_maison_sans_production_conso_reelle():
     conso = curve(250, 250, 250, 250, 250, 2250, 2250, 250)
-    assert house_series(conso, {}) == conso
-    assert house_series(conso, prod_of(0, 0, 0, 0, 0, 0, 0, 0)) == conso
+    expected = [(t, real_consumption(w)) for t, w in conso]
+    assert house_series(conso, {}) == expected
+    assert house_series(conso, prod_of(0, 0, 0, 0, 0, 0, 0, 0)) == expected
+
+
+def test_conso_reelle_part_reactive_retiree():
+    # Linky 10/11/2026 : ~120 W réels la nuit quand la pince lit ~240 W ; à forte charge, identique.
+    assert 115 < real_consumption(240) < 125
+    assert abs(real_consumption(2000) - 2000) < 12
+    assert real_consumption(150) == 0
+
+
+def test_energie_soutirage_et_injection_sur_la_courbe():
+    # 10 points à 7 s : 3 de soutirage (2 000 W lus), 4 figés sous 1 500 W de production, 3 de soutirage.
+    conso = curve(2000, 2000, 2000, 279, 279, 279, 279, 2000, 2000, 2000)
+    prod = prod_of(0, 0, 0, 1500, 1500, 1500, 1500, 0, 0, 0)
+    t_end = conso[-1][0]
+    grid_in, grid_out, house = curve_energy(conso, prod, None, t_end, 0.0)
+    # Soutirage : 6 intervalles de 7 s à ~1 989 W réels (le dernier point n'a pas de suivant).
+    assert abs(grid_in - 5 * 7 / 3600 * real_consumption(2000) / 1000) < 1e-9
+    # Injection : 4 intervalles à 1 500 W de production moins ~1 989 W de maison → 0 (la maison
+    # consommait plus que la production : estimation basse assumée).
+    assert grid_out == 0
+    # Avec une maison à 300 W avant le gel, l'injection vaut production − 300 W.
+    conso2 = curve(510, 510, 510, 279, 279, 279, 279, 510)
+    g_in, g_out, _ = curve_energy(conso2, prod, None, conso2[-1][0], 0.0)
+    assert abs(g_out - 4 * 7 / 3600 * (effective_production(1500) - real_consumption(510)) / 1000) < 1e-9
+    # Rien n'est compté deux fois : en deux passes, même total qu'en une.
+    a = curve_energy(conso, prod, None, conso[4][0], 0.0)
+    b = curve_energy(conso, prod, conso[4][0], t_end, a[2])
+    assert abs(a[0] + b[0] - grid_in) < 1e-12 and abs(a[1] + b[1] - grid_out) < 1e-12
 
 
 def test_maison_plancher_de_production_au_crepuscule():

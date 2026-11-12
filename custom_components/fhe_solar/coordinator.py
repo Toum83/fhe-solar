@@ -15,7 +15,7 @@ from homeassistant.util import dt as dt_util
 from .api import DashboardData, FheAuthError, FheClient, FheConnectionError
 from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, EVENT_POWER_CURVE, EVENT_POWER_STEP
 from .hour_lag import HourLagCompensator
-from .steps import PENDING_POINTS, detect_steps, house_series, new_curve_points, parse_serie
+from .steps import PENDING_POINTS, curve_energy, detect_steps, frozen_flags, house_series, new_curve_points, parse_serie, real_consumption, effective_production
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,9 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
         # Dernier point de la courbe déjà émis pour l'archive (événement fhe_solar_power_curve).
         self._curve_after_ms: int | None = None
         self._steps_loaded = False
+        # Compteurs de la courbe (0.7.0) : soutirage et injection cumulés, dernier point compté,
+        # dernier niveau connu de la maison (pour estimer l'injection pendant un gel).
+        self._energy: dict = {"after_ms": None, "import_kwh": 0.0, "export_kwh": 0.0, "house_w": 0.0}
 
     async def _async_update_data(self) -> DashboardData:
         try:
@@ -115,6 +118,7 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
             stored = await self._steps_store.async_load() or {}
             self._steps_after_ms = stored.get("after_ms")
             self._curve_after_ms = stored.get("curve_after_ms")
+            self._energy.update(stored.get("energy") or {})
             self._steps_loaded = True
         points = new_curve_points(conso, prod, self._curve_after_ms)
         if points:
@@ -145,6 +149,21 @@ class FheCoordinator(DataUpdateCoordinator[DashboardData]):
                     },
                 )
             self._steps_after_ms = max(self._steps_after_ms, cutoff)
+        # Soutirage et injection intégrés sur la courbe, jusqu'au même point que les échelons.
+        energy = self._energy
+        if energy["after_ms"] is None:
+            energy["after_ms"] = cutoff
+        elif cutoff > energy["after_ms"]:
+            grid_in, grid_out, house_w = curve_energy(conso, prod, energy["after_ms"], cutoff, energy["house_w"])
+            energy["import_kwh"] = round(energy["import_kwh"] + grid_in, 4)
+            energy["export_kwh"] = round(energy["export_kwh"] + grid_out, 4)
+            energy["house_w"] = house_w
+            energy["after_ms"] = cutoff
+        data.grid_import_curve = energy["import_kwh"]
+        data.grid_export_curve = energy["export_kwh"]
+        # Puissance de la maison au dernier point : inconnue pendant une injection.
+        last_prod = effective_production(prod.get(conso[-1][0], 0.0))
+        data.house_power = None if frozen_flags(conso, prod)[-1] else round(real_consumption(conso[-1][1]) + last_prod)
         self._steps_store.async_delay_save(
-            lambda: {"after_ms": self._steps_after_ms, "curve_after_ms": self._curve_after_ms}, 10
+            lambda: {"after_ms": self._steps_after_ms, "curve_after_ms": self._curve_after_ms, "energy": dict(self._energy)}, 10
         )

@@ -66,6 +66,11 @@ class DashboardData:
     device_label: str | None
     last_sample: datetime | None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
+    # Calculés par le coordinateur sur la courbe à 7 s (voir steps.curve_energy), cumulés depuis
+    # l'installation de la 0.7.0 : None tant qu'aucune courbe n'a été traitée.
+    grid_import_curve: float | None = None  # kWh
+    grid_export_curve: float | None = None  # kWh
+    house_power: float | None = None  # W, None pendant une injection
 
     @property
     def self_consumption_rate(self) -> float | None:

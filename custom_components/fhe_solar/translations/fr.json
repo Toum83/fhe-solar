@@ -88,6 +88,15 @@
       },
       "forecast_tomorrow": {
         "name": "Prévision production demain"
+      },
+      "grid_import_curve": {
+        "name": "Soutirage réseau (courbe corrigée)"
+      },
+      "grid_export_curve": {
+        "name": "Injection réseau (courbe corrigée)"
+      },
+      "house_power": {
+        "name": "Puissance de la maison"
       }
     }
   },
