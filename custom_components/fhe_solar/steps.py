@@ -41,6 +41,13 @@ SMALL_STEP_W = 200
 SPIKE_RETURN = 0.6
 # Au-delà, deux points ne sont pas consécutifs (trou dans la courbe FHE) : pas d'échelon à cheval.
 MAX_GAP_MS = 60_000
+# Un gros échelon peut tomber dans un trou de la courbe (17/11/2026 : le chauffe-eau du haut s'est
+# arrêté entre deux points espacés de 140 s, son arrêt n'a jamais été vu et la séance restée
+# ouverte n'a pas été comptée). Un écart d'au moins ce niveau entre les deux bords d'un trou, qui
+# tient aux points suivants, est émis à l'heure du premier point après le trou, jusqu'à 10 min de
+# trou (au-delà, panne de relevé : le niveau d'avant n'a plus de sens).
+GAP_STEP_W = 800
+MAX_BRIDGED_GAP_MS = 600_000
 
 
 # La pince « Production » lit ~120 W dès que l'onduleur est sous tension, sans puissance réelle :
@@ -196,7 +203,15 @@ def detect_steps(
         t0, w0 = points[i]
         t1, w1 = points[i + 1]
         d = w1 - w0
-        if t1 - t0 > MAX_GAP_MS or abs(d) < CONTINUE_W:
+        if t1 - t0 > MAX_GAP_MS:
+            held = i + 2 >= n or (
+                points[i + 2][0] - t1 <= MAX_GAP_MS and abs(points[i + 2][1] - w1) < abs(d) / 2
+            )
+            if abs(d) >= GAP_STEP_W and t1 - t0 <= MAX_BRIDGED_GAP_MS and held and (after_ms is None or t1 > after_ms):
+                steps.append(Step(t1, w0, w1, production.get(t1)))
+            i += 1
+            continue
+        if abs(d) < CONTINUE_W:
             i += 1
             continue
         # Impulsion d'un seul point (le point suivant revient au niveau de départ) : un vrai

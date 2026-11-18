@@ -62,8 +62,26 @@ def test_seuls_les_echelons_apres_le_dernier_point_traite():
     assert len(s) == 1 and s[0].delta_w == -2000
 
 
-def test_trou_dans_la_courbe_pas_d_echelon_a_cheval():
-    pts = [(T0, 300.0), (T0 + 120_000, 2300.0), (T0 + 127_000, 2300.0)]
+def test_trou_dans_la_courbe_petit_echelon_pas_d_echelon_a_cheval():
+    pts = [(T0, 300.0), (T0 + 120_000, 700.0), (T0 + 127_000, 700.0)]
+    assert detect_steps(pts, None) == []
+
+
+def test_trou_dans_la_courbe_gros_echelon_emis_au_bord_du_trou():
+    # 17/11/2026 : le chauffe-eau (2,2 kW) s'arrête dans un trou de 140 s.
+    pts = [(T0, 2200.0), (T0 + 140_000, 130.0), (T0 + 147_000, 132.0), (T0 + 154_000, 130.0)]
+    s = detect_steps(pts, None)
+    assert len(s) == 1 and s[0].ts_ms == T0 + 140_000 and s[0].delta_w == -2070
+    assert detect_steps(pts, T0 + 140_000) == []
+
+
+def test_trou_dans_la_courbe_pointe_qui_ne_tient_pas_ignoree():
+    pts = [(T0, 300.0), (T0 + 140_000, 2300.0), (T0 + 147_000, 300.0), (T0 + 154_000, 300.0)]
+    assert all(x.ts_ms != T0 + 140_000 for x in detect_steps(pts, None))
+
+
+def test_panne_de_releve_longue_pas_d_echelon():
+    pts = [(T0, 2200.0), (T0 + 1_800_000, 130.0), (T0 + 1_807_000, 130.0)]
     assert detect_steps(pts, None) == []
 
 
